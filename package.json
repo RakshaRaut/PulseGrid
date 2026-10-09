@@ -1,0 +1,10 @@
+{
+  "name": "pulse-grid",
+  "private": true,
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "start:dev": "npm --workspace backend run start:dev"
+  }
+}
