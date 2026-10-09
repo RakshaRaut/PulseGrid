@@ -1,10 +1,24 @@
 {
   "name": "pulse-grid",
+  "type": "module",
   "private": true,
   "workspaces": [
     "backend"
   ],
   "scripts": {
-    "start:dev": "npm --workspace backend run start:dev"
+    "start:dev": "npm --workspace backend run start:dev",
+    "contract:emit": "prisma contract emit"
+  },
+  "prisma": {
+    "schema": "backend/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "@prisma/cli-engine": "^0.7.0",
+    "@types/node": "^26.6.4",
+    "prisma": "^7.0.0"
+  },
+  "dependencies": {
+    "@prisma/orm-postgres": "^8.0.0-rc.17",
+    "dotenv": "^18.0.6"
   }
 }
