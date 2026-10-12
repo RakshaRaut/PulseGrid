@@ -52,9 +52,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      THINGSBOARD_HOST: ${THINGSBOARD_HOST:?Set THINGSBOARD_HOST in root .env}
-      THINGSBOARD_PORT: ${THINGSBOARD_PORT:-1883}
+      THINGSBOARD_HOST: thingsboard
+      THINGSBOARD_PORT: 1883
       THINGSBOARD_TOKEN: ${THINGSBOARD_TOKEN:?Set THINGSBOARD_TOKEN in root .env}
+    depends_on:
+      thingsboard:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD
@@ -66,5 +69,83 @@ services:
       retries: 10
       start_period: 10s
 
+  thingsboard-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${TB_DB_NAME:-thingsboard}
+      POSTGRES_USER: ${TB_DB_USER:-tbuser}
+      POSTGRES_PASSWORD: ${TB_DB_PASSWORD:-change_this_password}
+    volumes:
+      - thingsboard-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  thingsboard:
+    image: thingsboard/tb-node:4.3.1.6
+    restart: unless-stopped
+    depends_on:
+      thingsboard-db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://thingsboard-db:5432/${TB_DB_NAME:-thingsboard}
+      SPRING_DATASOURCE_USERNAME: ${TB_DB_USER:-tbuser}
+      SPRING_DATASOURCE_PASSWORD: ${TB_DB_PASSWORD:-change_this_password}
+      TB_QUEUE_TYPE: in-memory
+    ports:
+      - "${TB_HTTP_PORT:-18080}:8080"
+      - "${TB_MQTT_PORT:-11883}:1883"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: dockerfile
+    restart: unless-stopped
+    expose:
+      - "80"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --spider --quiet http://127.0.0.1/ || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --spider --quiet http://127.0.0.1/ || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 volumes:
+  thingsboard-db-data:
   postgres_data:

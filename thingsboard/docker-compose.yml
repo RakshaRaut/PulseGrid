@@ -1,0 +1,20 @@
+  thingsboard-db:
+    image: postgres:16
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${TB_DB_NAME}
+      POSTGRES_USER: ${TB_DB_USER}
+      POSTGRES_PASSWORD: ${TB_DB_PASSWORD}
+
+    volumes:
+      - thingsboard-db-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
