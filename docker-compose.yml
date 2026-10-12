@@ -1,18 +1,70 @@
 services:
-
   database:
-    image: postgres:17
-
+    image: postgres:16
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: iot_monitoring
-
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in root .env}
+      POSTGRES_DB: ${POSTGRES_DB:-iot_monitoring}
     ports:
-      - "5432:5432"
-
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-iot_monitoring}?schema=public"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in root .env}
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  iot-simulator:
+    build:
+      context: ./iot-simulator
+      dockerfile: dockerfile
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      THINGSBOARD_HOST: ${THINGSBOARD_HOST:?Set THINGSBOARD_HOST in root .env}
+      THINGSBOARD_PORT: ${THINGSBOARD_PORT:-1883}
+      THINGSBOARD_TOKEN: ${THINGSBOARD_TOKEN:?Set THINGSBOARD_TOKEN in root .env}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "try { process.kill(1, 0); } catch { process.exit(1); }"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 volumes:
   postgres_data:
