@@ -1,37 +1,62 @@
+import mqtt from "mqtt";
+import "dotenv/config";
+
+const host = process.env.THINGSBOARD_HOST;
+const port = Number(process.env.THINGSBOARD_PORT || 1883);
+const token = process.env.THINGSBOARD_TOKEN;
+
+if (!host || !token) {
+    throw new Error(
+        "Please configure THINGSBOARD_HOST and THINGSBOARD_TOKEN in your .env file"
+    );
+}
+
+const brokerUrl = `mqtt://${host}:${port}`;
+const topic = "v1/devices/me/telemetry";
+
+const client = mqtt.connect(brokerUrl, {
+    username: token,
+    clientId: `sensor_${Math.random().toString(16).slice(2, 10)}`,
+});
+
 function generateSensorData() {
-    const temperature = Number(
-        (20 + Math.random() * 15).toFixed(1)
-    );
-
-    const humidity = Math.floor(
-        40 + Math.random() * 41
-    );
-
-    const battery = Math.floor(
-        20 + Math.random() * 81
-    );
-
     return {
-        temperature,
-        humidity,
-        battery,
+        temperature: Number(
+            (20 + Math.random() * 15).toFixed(1)
+        ),
+        humidity: Math.floor(40 + Math.random() * 41),
+        battery: Math.floor(20 + Math.random() * 81),
+        timestamp: new Date().toISOString(),
     };
 }
 
-function displaySensorData() {
-    const data = generateSensorData();
+client.on("connect", () => {
+    console.log("Connected to ThingsBoard MQTT!");
+    console.log("Sending telemetry every 5 seconds.\n");
 
-    console.log("================================");
-    console.log("         IoT Simulator");
-    console.log("================================");
+    function publishTelemetry() {
+        const data = generateSensorData();
 
-    console.log(`Temperature: ${data.temperature}°C`);
-    console.log(`Humidity:    ${data.humidity}%`);
-    console.log(`Battery:     ${data.battery}%`);
+        client.publish(
+            topic,
+            JSON.stringify(data),
+            { qos: 0 },
+            (error) => {
+                if (error) {
+                    console.error("Publish failed:", error.message);
+                    return;
+                }
 
-    console.log("================================\n");
-}
+                console.log("Telemetry sent:", data);
+            }
+        );
+    }
 
-displaySensorData();
+    publishTelemetry();
 
-setInterval(displaySensorData, 5000);
+    setInterval(publishTelemetry, 5000);
+});
+
+client.on("error", (error) => {
+    console.error("MQTT error:", error.message);
+});
