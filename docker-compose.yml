@@ -14,9 +14,9 @@ services:
       test:
         - CMD-SHELL
         - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
       start_period: 10s
 
   backend:
@@ -30,6 +30,8 @@ services:
       PORT: 3000
       DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-iot_monitoring}?schema=public"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in root .env}
+      OBSERVE_APP_KEY: ${OBSERVE_APP_KEY:-}
+      OBSERVE_APP_SECRET: ${OBSERVE_APP_SECRET:-}
     depends_on:
       database:
         condition: service_healthy
@@ -84,7 +86,7 @@ services:
         - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
       start_period: 10s
 
   thingsboard:

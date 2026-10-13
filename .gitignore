@@ -1,3 +1,16 @@
-node_modules/
-dist/
+# Environment variables and secrets
 .env
+.env.*
+!.env.example
+!.env.development.example
+!.env.production.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# Logs
+*.log
