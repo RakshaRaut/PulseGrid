@@ -5,9 +5,14 @@ const host = process.env.THINGSBOARD_HOST;
 const port = Number(process.env.THINGSBOARD_PORT || 1883);
 const token = process.env.THINGSBOARD_TOKEN;
 
-if (!host || !token) {
+if (
+    !host ||
+    !token ||
+    token === "your_actual_device_token" ||
+    token === "your_actual_device_access_token"
+) {
     throw new Error(
-        "Please configure THINGSBOARD_HOST and THINGSBOARD_TOKEN in your .env file"
+        "Configure THINGSBOARD_HOST and a real ThingsBoard THINGSBOARD_TOKEN before starting the simulator"
     );
 }
 
@@ -59,4 +64,6 @@ client.on("connect", () => {
 
 client.on("error", (error) => {
     console.error("MQTT error:", error.message);
+    client.end(true);
+    process.exitCode = 1;
 });

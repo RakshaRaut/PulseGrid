@@ -11,7 +11,9 @@ npm run build    # production bundle
 npm run lint     # oxlint
 ```
 
-**Demo login:** `demo@pulsegrid.io` / `demo1234` (or register a new account — all client-side).
+The frontend calls `/api` by default. Vite proxies that path to the local
+backend during development, and the production Nginx gateway routes it to the
+backend service. Set `VITE_API_URL` only when the API is hosted elsewhere.
 
 ## Pages
 
@@ -34,7 +36,7 @@ src/
 │   ├── layout/Layout.jsx        # app shell: sidebar, topbar, ⌘K search, notifications
 │   └── ui/                      # cards, forms, badges (design-system primitives)
 ├── context/
-│   ├── auth.jsx                 # mock auth + device fleet state + 5s telemetry tick
+│   ├── auth.jsx                 # API authentication and device fleet state
 │   └── toast.jsx                # toast notification system
 ├── data/mockDevices.js          # seeded realistic device + telemetry generator
 ├── pages/                       # route-level screens
@@ -42,8 +44,9 @@ src/
 ```
 
 - Navigation (⌘K search, sidebar, notifications) and protected routes are functional.
-- Authentication is persistent in `localStorage`; devices are deterministic per session with a live drifting feed.
+- Authentication uses the backend JWT API; the token and session are persisted in `localStorage`.
+- Device CRUD is scoped to the authenticated user and persisted by the backend. Telemetry presentation is generated from returned device metadata until live telemetry endpoints are available.
+- Live telemetry is polled from `/api/devices/telemetry` every five seconds. Configure the backend with ThingsBoard credentials (`TB_USERNAME`/`TB_PASSWORD` or `TB_JWT_TOKEN`) and `THINGSBOARD_DEVICE_ID`; the ThingsBoard keys are controlled by `TB_TELEMETRY_KEYS`.
+- On every device refresh, the backend discovers tenant devices from ThingsBoard and synchronizes them into the logged-in user's PulseGrid device list. For local backend development, use `TB_BASE_URL=http://localhost:18080`; inside Docker, use `http://thingsboard:8080`.
 - All forms validate, show loading states, and surface errors via toasts and inline messages.
 - Empty states included everywhere data can be missing.
-
-> Splitting into a real API later: replace `context/auth.jsx` device mutations / mock login with `fetch` calls — the UI layer stays untouched.

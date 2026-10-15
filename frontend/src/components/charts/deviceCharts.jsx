@@ -85,7 +85,7 @@ export function BatteryBarChart({ data }) {
       <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
         <CartesianGrid stroke={GRID_COLOR} strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="time" tick={AXIS_STYLE} tickLine={false} axisLine={false} minTickGap={40} />
-        <YAxis domain={[0, 100]} tick={AXIS_STYLE} tickLine={false} axisLine={false} width={40} unit="%" />
+        <YAxis domain={[0, 100]} tick={AXIS_STYLE} tickLine={false} axisLine={false} width={48} unit="%" />
         <Tooltip content={<ChartTooltip unit="%" />} cursor={{ fill: 'rgba(99,102,241,0.08)' }} />
         <Bar dataKey="battery" name="Battery" radius={[4, 4, 0, 0]} maxBarSize={14}>
           {data.map((d, i) => (

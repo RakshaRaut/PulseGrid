@@ -120,8 +120,7 @@ export default function Login() {
         </Button>
       </form>
       <div className="mt-6 rounded-xl border border-dashed border-border bg-surface-2/60 px-4 py-3 text-xs text-slate-400">
-        <p className="font-semibold text-slate-300">Demo credentials</p>
-        <p className="mt-1">Email: demo@pulsegrid.io · Password: demo1234</p>
+        Create an account to connect to your backend device workspace.
       </div>
     </AuthLayout>
   )

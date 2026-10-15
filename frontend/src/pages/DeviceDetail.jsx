@@ -94,11 +94,15 @@ export default function DeviceDetail() {
     setTimeout(() => setRefreshing(false), 600)
   }
 
-  const handleDelete = () => {
-    removeDevice(device.id)
-    notify(`${device.name} removed from fleet.`, 'info')
-    setConfirmOpen(false)
-    navigate('/devices')
+  const handleDelete = async () => {
+    try {
+      await removeDevice(device.id)
+      notify(`${device.name} removed from fleet.`, 'info')
+      setConfirmOpen(false)
+      navigate('/devices')
+    } catch (error) {
+      notify(error.message, 'error')
+    }
   }
 
   return (
@@ -109,7 +113,7 @@ export default function DeviceDetail() {
           <nav aria-label="Breadcrumb" className="text-xs text-slate-500">
             <Link to="/devices" className="hover:text-slate-300">Devices</Link>
             <span className="mx-1.5">/</span>
-            <span className="text-slate-300">{device.id}</span>
+            <span className="text-slate-300">{device.deviceKey}</span>
           </nav>
           <div className="mt-2 flex items-center gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent-hover">

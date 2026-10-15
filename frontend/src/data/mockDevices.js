@@ -97,7 +97,8 @@ function buildStatusHistory(id, device) {
 
 export function seededDevices() {
   const devices = []
-  for (let i = 0; i < 20; i++) {
+  // Only one seeded device — the rest are created by users via the app.
+  for (let i = 0; i < 1; i++) {
     const id = `DEV-${String(1001 + i).padStart(4, '0')}`
     const name = `${pick(NAMES_FIRST)} ${pick(NAMES_LAST)}`
     const statusRoll = rand()
@@ -118,6 +119,21 @@ export function seededDevices() {
     devices.push(device)
   }
   return devices
+}
+
+// Fill in the presentation fields the backend API doesn't store.
+// Values are derived deterministically from the device id so a given
+// device always shows the same numbers between renders/reloads.
+export function withDerivedFields(device) {
+  const seed = seedForId(device.id ?? String(device.deviceKey ?? device.name))
+  const r = mulberry32(seed)
+  return {
+    ...device,
+    batteryPercent: device.batteryPercent ?? Math.round(35 + r() * 60),
+    signal: device.signal ?? Math.round(45 + r() * 55),
+    firmware: device.firmware ?? `v${1 + Math.floor(r() * 3)}.${Math.floor(r() * 10)}.${Math.floor(r() * 9)}`,
+    status: device.status ?? 'offline',
+  }
 }
 
 export function buildFullDevice(device) {

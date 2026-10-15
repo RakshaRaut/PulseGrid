@@ -25,22 +25,30 @@ services:
       dockerfile: dockerfile
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${BACKEND_HOST_PORT:-3000}:3000"
     environment:
       PORT: 3000
       DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-iot_monitoring}?schema=public"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in root .env}
+      TB_BASE_URL: ${TB_BASE_URL:-http://thingsboard:8080}
+      TB_USERNAME: ${TB_USERNAME:-}
+      TB_PASSWORD: ${TB_PASSWORD:-}
+      TB_JWT_TOKEN: ${TB_JWT_TOKEN:-}
+      THINGSBOARD_DEVICE_ID: ${THINGSBOARD_DEVICE_ID:-}
+      TB_TELEMETRY_KEYS: ${TB_TELEMETRY_KEYS:-temperature,humidity,battery}
       OBSERVE_APP_KEY: ${OBSERVE_APP_KEY:-}
       OBSERVE_APP_SECRET: ${OBSERVE_APP_SECRET:-}
     depends_on:
       database:
+        condition: service_healthy
+      thingsboard:
         condition: service_healthy
     healthcheck:
       test:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:3000/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"
+        - "fetch('http://127.0.0.1:3000/api/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1))"
       interval: 5s
       timeout: 5s
       retries: 10
@@ -65,7 +73,7 @@ services:
         - CMD
         - node
         - -e
-        - "try { process.kill(1, 0); } catch { process.exit(1); }"
+        - "const net = require('net'); const socket = net.createConnection({ host: process.env.THINGSBOARD_HOST, port: Number(process.env.THINGSBOARD_PORT) }); socket.setTimeout(3000); socket.on('connect', () => { socket.destroy(); }); socket.on('timeout', () => { socket.destroy(); process.exit(1); }); socket.on('error', () => process.exit(1));"
       interval: 10s
       timeout: 5s
       retries: 10

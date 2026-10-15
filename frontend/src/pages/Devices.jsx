@@ -25,7 +25,7 @@ const DEVICE_TYPES = typeOptions.map((t) => t.value)
 const LOCATIONS = ['Warehouse A', 'Warehouse B', 'Server Room', 'Greenhouse', 'Production Floor', 'Rooftop']
 
 function AddDeviceModal({ open, onClose, onSubmit }) {
-  const [values, setValues] = useState({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0], status: 'online' })
+  const [values, setValues] = useState({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0], status: 'online', thingsboardId: '' })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
 
@@ -45,10 +45,11 @@ function AddDeviceModal({ open, onClose, onSubmit }) {
     if (Object.keys(validation).length) return
     setSaving(true)
     try {
-      await new Promise((r) => setTimeout(r, 500)) // simulate save
-      onSubmit(values)
-      setValues({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0], status: 'online' })
+      await onSubmit(values)
+      setValues({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0], status: 'online', thingsboardId: '' })
       onClose()
+    } catch (error) {
+      setErrors({ form: error.message })
     } finally {
       setSaving(false)
     }
@@ -67,6 +68,7 @@ function AddDeviceModal({ open, onClose, onSubmit }) {
           </button>
         </div>
         <form className="mt-5 space-y-4" onSubmit={handleSubmit} noValidate>
+          {errors.form && <p role="alert" className="text-sm text-rose-300">{errors.form}</p>}
           <Field label="Device name" htmlFor="device-name" error={errors.name}>
             <Input
               id="device-name"
@@ -100,6 +102,14 @@ function AddDeviceModal({ open, onClose, onSubmit }) {
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </Select>
+          </Field>
+          <Field label="ThingsBoard device ID (optional)" htmlFor="thingsboard-id">
+            <Input
+              id="thingsboard-id"
+              placeholder="UUID from ThingsBoard"
+              value={values.thingsboardId}
+              onChange={(e) => setValues({ ...values, thingsboardId: e.target.value })}
+            />
           </Field>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -221,16 +231,23 @@ export default function Devices() {
   const activeFilters = [statusFilter !== 'all', typeFilter !== 'all', locationFilter !== 'all'].filter(Boolean).length
   const hasSearched = search || activeFilters > 0
 
-  const handleAdd = (input) => {
-    addDevice(input)
+  const handleAdd = async (input) => {
+    await addDevice({
+      ...input,
+      deviceKey: `${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+    })
     notify(`${input.name} added successfully!`, 'success')
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!confirmDelete) return
-    removeDevice(confirmDelete.id)
-    notify(`${confirmDelete.name} removed from fleet.`, 'info')
-    setConfirmDelete(null)
+    try {
+      await removeDevice(confirmDelete.id)
+      notify(`${confirmDelete.name} removed from fleet.`, 'info')
+      setConfirmDelete(null)
+    } catch (error) {
+      notify(error.message, 'error')
+    }
   }
 
   const resetFilters = () => {
