@@ -45,7 +45,7 @@ function TelemetryCard({ icon: Icon, label, value, unit, tone, sparklineNote }) 
 export default function DeviceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { devices, loading: authLoading, removeDevice } = useAuth()
+  const { devices, loading: authLoading, refreshDevices, removeDevice } = useAuth()
   const { notify } = useToast()
 
   const device = useMemo(() => devices.find((d) => d.id === id), [devices, id])
@@ -89,9 +89,15 @@ export default function DeviceDetail() {
 
   const offline = device.status === 'offline'
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 600)
+    try {
+      await refreshDevices()
+    } catch (error) {
+      notify(error.message, 'error')
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const handleDelete = async () => {
@@ -123,7 +129,7 @@ export default function DeviceDetail() {
               <h2 className="truncate text-xl font-bold text-white sm:text-2xl">{device.name}</h2>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400">
                 <span className="flex items-center gap-1"><MapPin size={12} aria-hidden="true" /> {device.location}</span>
-                <span className="flex items-center gap-1"><Signal size={12} aria-hidden="true" /> {device.signal}%</span>
+                <span className="flex items-center gap-1"><Signal size={12} aria-hidden="true" /> {device.signal == null ? 'Unavailable' : `${device.signal}%`}</span>
               </p>
             </div>
           </div>
@@ -133,9 +139,9 @@ export default function DeviceDetail() {
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={offline || refreshing}
+            disabled={refreshing}
             className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-2/70 px-3 py-2 text-xs font-medium text-slate-300 transition hover:bg-surface-2 disabled:opacity-50"
-            title={offline ? 'Device offline — telemetry unavailable' : 'Refresh telemetry'}
+            title={offline ? 'Retry telemetry' : 'Refresh telemetry'}
           >
             <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} aria-hidden="true" />
             Refresh
@@ -160,6 +166,16 @@ export default function DeviceDetail() {
       {offline && (
         <p className="rounded-xl border border-rose-500/20 bg-rose-500/5 px-4 py-2.5 text-xs text-rose-300">
           ⚠ Device is offline — telemetry readings are stale. Values shown are the last successfully reported readings.
+        </p>
+      )}
+      {!device.live && device.telemetryError && (
+        <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-300">
+          Telemetry is currently unavailable. {device.telemetryError}
+        </p>
+      )}
+      {!device.live && !device.telemetryError && (
+        <p className="rounded-xl border border-slate-500/20 bg-slate-500/5 px-4 py-2.5 text-xs text-slate-400">
+          No telemetry has been reported for this device yet.
         </p>
       )}
 
@@ -189,9 +205,9 @@ export default function DeviceDetail() {
         <TelemetryCard
           icon={Signal}
           label="Signal strength"
-          value={`${device.signal}%`}
+          value={device.signal == null ? '—' : `${device.signal}%`}
           tone={device.signal >= 60 ? 'emerald' : device.signal >= 30 ? 'sky' : 'rose'}
-          sparklineNote={`Last seen ${formatRelativeTime(device.lastSeen)}`}
+          sparklineNote={device.signal == null ? 'Not reported by device' : `Last seen ${formatRelativeTime(device.lastSeen)}`}
         />
       </section>
 

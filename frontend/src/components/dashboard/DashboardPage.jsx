@@ -8,11 +8,15 @@ import Thermometer from 'lucide-react/dist/esm/icons/thermometer'
 import Droplets from 'lucide-react/dist/esm/icons/droplets'
 import BatteryCharging from 'lucide-react/dist/esm/icons/battery-charging'
 import ArrowUpRight from 'lucide-react/dist/esm/icons/arrow-up-right'
+import Plus from 'lucide-react/dist/esm/icons/plus'
+import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
+import History from 'lucide-react/dist/esm/icons/history'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip } from 'recharts'
 import { useAuth } from '../../context/auth.jsx'
 import { Card, StatCard, SectionHeader, EmptyState } from '../ui/cards.jsx'
 import { StatusChip, TypeIcon } from '../ui/badges.jsx'
 import { formatRelativeTime, formatTemp, formatHumidity, formatBattery } from '../../utils/format.js'
+import { getDeviceEvents } from '../../utils/deviceEvents.js'
 import { TempHumidityChart, BatteryGauge } from '../charts/deviceCharts.jsx'
 
 const STATUS_COLORS = ['#34d399', '#f87171', '#fbbf24']
@@ -29,7 +33,37 @@ export default function DashboardPage() {
     const avgTemp = reading.length ? reading.reduce((s, d) => s + d.live.temperature, 0) / reading.length : 0
     const avgHum = reading.length ? reading.reduce((s, d) => s + d.live.humidity, 0) / reading.length : 0
     const avgBat = reading.length ? reading.reduce((s, d) => s + d.live.battery, 0) / reading.length : 0
-    return { total, online, offline, maintenance, avgTemp, avgHum, avgBat }
+    const lowBatteryCount = devices.filter((d) => d.live && d.live.battery <= 35).length
+    // Most recently updated device reporting to the backend (source of
+    // 'latest temperature', 'latest humidity' and the fleet 'last update').
+    const [latest] = devices
+      .filter((d) => d.live && d.live.updatedAt)
+      .sort((a, b) => b.live.updatedAt - a.live.updatedAt)
+    // Add/remove history recorded locally (the backend does not keep
+    // removed-device history). Refreshes alongside the 5s device poll.
+    const events = getDeviceEvents()
+    const added = events.filter((event) => event.type === 'added')
+    const removed = events.filter((event) => event.type === 'removed')
+    const lastItemOf = (list) =>
+      list[0] ? `${list[0].name} · ${formatRelativeTime(list[0].at)}` : 'None recorded yet'
+    return {
+      total,
+      online,
+      offline,
+      maintenance,
+      avgTemp,
+      avgHum,
+      avgBat,
+      lowBatteryCount,
+      readingCount: reading.length,
+      latest,
+      activity: {
+        addedCount: added.length,
+        removedCount: removed.length,
+        lastAdded: lastItemOf(added),
+        lastRemoved: lastItemOf(removed),
+      },
+    }
   }, [devices])
 
   const statusData = useMemo(
@@ -75,6 +109,71 @@ export default function DashboardPage() {
         />
         <StatCard icon={WifiOff} label="Offline" value={stats.offline} hint={stats.offline ? 'Needs attention' : 'All clear'} tone="danger" />
         <StatCard icon={Wrench} label="In maintenance" value={stats.maintenance} hint="Scheduled work" tone="warning" />
+      </section>
+
+      {/* Backend telemetry snapshot */}
+      <section aria-label="Telemetry snapshot" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={Thermometer}
+          label="Total temperature"
+          tone="accent"
+          value={stats.readingCount ? formatTemp(stats.avgTemp) : '—'}
+          hint={
+            stats.latest
+              ? `Fleet avg · latest ${formatTemp(stats.latest.live.temperature)} (${stats.latest.name})`
+              : 'No live telemetry yet'
+          }
+        />
+        <StatCard
+          icon={Thermometer}
+          label="Latest temperature"
+          tone="accent"
+          value={stats.latest ? formatTemp(stats.latest.live.temperature) : '—'}
+          hint={stats.latest ? `From ${stats.latest.name}` : 'No live telemetry yet'}
+        />
+        <StatCard
+          icon={Droplets}
+          label="Latest humidity"
+          tone="accent"
+          value={stats.latest ? formatHumidity(stats.latest.live.humidity) : '—'}
+          hint={stats.latest ? `Fleet avg ${formatHumidity(stats.avgHum)}` : 'No live telemetry yet'}
+        />
+        <StatCard
+          icon={BatteryCharging}
+          label="Battery status"
+          tone={stats.lowBatteryCount ? 'warning' : 'success'}
+          value={stats.readingCount ? formatBattery(stats.avgBat) : '—'}
+          hint={
+            stats.lowBatteryCount
+              ? `${stats.lowBatteryCount} device${stats.lowBatteryCount > 1 ? 's' : ''} at or below 35%`
+              : 'All reporting devices above 35%'
+          }
+        />
+      </section>
+
+      {/* Device lifecycle activity */}
+      <section aria-label="Device lifecycle" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          icon={Plus}
+          label="Devices added"
+          tone="success"
+          value={stats.activity.addedCount}
+          hint={`Most recent: ${stats.activity.lastAdded}`}
+        />
+        <StatCard
+          icon={Trash2}
+          label="Devices removed"
+          tone={stats.activity.removedCount ? 'neutral' : 'success'}
+          value={stats.activity.removedCount}
+          hint={`Most recent: ${stats.activity.lastRemoved}`}
+        />
+        <StatCard
+          icon={History}
+          label="Last update"
+          tone="neutral"
+          value={stats.latest ? formatRelativeTime(stats.latest.live.updatedAt) : '—'}
+          hint={stats.latest ? `${stats.latest.name} · refreshes every 5s` : 'Waiting for telemetry'}
+        />
       </section>
 
       {/* Sensor readings + status distribution */}

@@ -38,7 +38,7 @@ src/
 ├── context/
 │   ├── auth.jsx                 # API authentication and device fleet state
 │   └── toast.jsx                # toast notification system
-├── data/mockDevices.js          # seeded realistic device + telemetry generator
+├── services/telemetryService.js # backend device and telemetry integration
 ├── pages/                       # route-level screens
 └── utils/format.js              # formatting helpers
 ```
@@ -46,7 +46,8 @@ src/
 - Navigation (⌘K search, sidebar, notifications) and protected routes are functional.
 - Authentication uses the backend JWT API; the token and session are persisted in `localStorage`.
 - Device CRUD is scoped to the authenticated user and persisted by the backend. Telemetry presentation is generated from returned device metadata until live telemetry endpoints are available.
-- Live telemetry is polled from `/api/devices/telemetry` every five seconds. Configure the backend with ThingsBoard credentials (`TB_USERNAME`/`TB_PASSWORD` or `TB_JWT_TOKEN`) and `THINGSBOARD_DEVICE_ID`; the ThingsBoard keys are controlled by `TB_TELEMETRY_KEYS`.
+- Live telemetry is polled from `/api/devices/telemetry` every five seconds. Configure the backend with ThingsBoard credentials (`TB_USERNAME`/`TB_PASSWORD` or `TB_JWT_TOKEN`); the ThingsBoard keys are controlled by `TB_TELEMETRY_KEYS`. Devices are created and linked by the backend.
 - On every device refresh, the backend discovers tenant devices from ThingsBoard and synchronizes them into the logged-in user's PulseGrid device list. For local backend development, use `TB_BASE_URL=http://localhost:18080`; inside Docker, use `http://thingsboard:8080`.
 - All forms validate, show loading states, and surface errors via toasts and inline messages.
 - Empty states included everywhere data can be missing.
+

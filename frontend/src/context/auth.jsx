@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { apiRequest } from '../services/api.js'
-import { createDevice, deleteDevice, fetchDevices } from '../services/telemetryService.js'
+import { apiRequest, TOKEN_STORAGE_KEY } from '../services/api.js'
+import { createDevice, deleteDevice, fetchDevices, updateDevice } from '../services/telemetryService.js'
+import { recordDeviceAdded, recordDeviceRemoved } from '../utils/deviceEvents.js'
 
 const AuthContext = createContext(null)
 const STORAGE_SESSION = 'pulsegrid.session'
-const STORAGE_TOKEN = 'pulsegrid.accessToken'
+const STORAGE_TOKEN = TOKEN_STORAGE_KEY
 
 function loadSession() {
   try {
@@ -82,18 +83,27 @@ export function AuthProvider({ children }) {
 
   const addDevice = useCallback(async (input) => {
     const device = await createDevice(input)
+    recordDeviceAdded(device)
     setDevices((previous) => [device, ...previous])
     return device
   }, [])
 
   const removeDevice = useCallback(async (id) => {
+    const removed = devices.find((device) => device.id === id)
     await deleteDevice(id)
+    recordDeviceRemoved(removed)
     setDevices((previous) => previous.filter((device) => device.id !== id))
+  }, [devices])
+
+  const editDevice = useCallback(async (id, input) => {
+    const device = await updateDevice(id, input)
+    setDevices((previous) => previous.map((item) => (item.id === id ? device : item)))
+    return device
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, devices, addDevice, removeDevice }),
-    [user, loading, login, register, logout, devices, addDevice, removeDevice],
+    () => ({ user, loading, login, register, logout, devices, refreshDevices: loadDevices, addDevice, editDevice, removeDevice }),
+    [user, loading, login, register, logout, devices, loadDevices, addDevice, editDevice, removeDevice],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

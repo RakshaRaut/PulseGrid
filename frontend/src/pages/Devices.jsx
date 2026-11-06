@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Cpu from 'lucide-react/dist/esm/icons/cpu'
 import Search from 'lucide-react/dist/esm/icons/search'
@@ -8,6 +8,7 @@ import List from 'lucide-react/dist/esm/icons/list'
 import Filter from 'lucide-react/dist/esm/icons/filter'
 import X from 'lucide-react/dist/esm/icons/x'
 import Trash2 from 'lucide-react/dist/esm/icons/trash-2'
+import Pencil from 'lucide-react/dist/esm/icons/pencil'
 import ArrowUpRight from 'lucide-react/dist/esm/icons/arrow-up-right'
 import Signal from 'lucide-react/dist/esm/icons/signal'
 import MapPin from 'lucide-react/dist/esm/icons/map-pin'
@@ -24,10 +25,17 @@ import { formatRelativeTime, formatTemp, formatHumidity, formatBattery } from '.
 const DEVICE_TYPES = typeOptions.map((t) => t.value)
 const LOCATIONS = ['Warehouse A', 'Warehouse B', 'Server Room', 'Greenhouse', 'Production Floor', 'Rooftop']
 
-function AddDeviceModal({ open, onClose, onSubmit }) {
-  const [values, setValues] = useState({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0], status: 'online', thingsboardId: '' })
+function AddDeviceModal({ open, onClose, onSubmit, device }) {
+  const [values, setValues] = useState({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0] })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setValues(device
+      ? { name: device.name, type: device.type, location: device.location || '' }
+      : { name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0] })
+    setErrors({})
+  }, [device, open])
 
   if (!open) return null
 
@@ -46,7 +54,7 @@ function AddDeviceModal({ open, onClose, onSubmit }) {
     setSaving(true)
     try {
       await onSubmit(values)
-      setValues({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0], status: 'online', thingsboardId: '' })
+      setValues({ name: '', type: DEVICE_TYPES[0], location: LOCATIONS[0] })
       onClose()
     } catch (error) {
       setErrors({ form: error.message })
@@ -60,8 +68,8 @@ function AddDeviceModal({ open, onClose, onSubmit }) {
       <div className="animate-fade-up w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl shadow-black/50">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-white">Add new device</h3>
-            <p className="mt-0.5 text-sm text-slate-400">Register a sensor on your network.</p>
+            <h3 className="text-lg font-semibold text-white">{device ? 'Edit device' : 'Add new device'}</h3>
+            <p className="mt-0.5 text-sm text-slate-400">{device ? 'Update the device in PostgreSQL and ThingsBoard.' : 'Register a sensor in ThingsBoard.'}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-surface-2 hover:text-white" aria-label="Close">
             <X size={18} />
@@ -96,24 +104,9 @@ function AddDeviceModal({ open, onClose, onSubmit }) {
               ))}
             </Select>
           </Field>
-          <Field label="Initial status" htmlFor="device-status">
-            <Select id="device-status" value={values.status} onChange={(e) => setValues({ ...values, status: e.target.value })}>
-              {statusOptions.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="ThingsBoard device ID (optional)" htmlFor="thingsboard-id">
-            <Input
-              id="thingsboard-id"
-              placeholder="UUID from ThingsBoard"
-              value={values.thingsboardId}
-              onChange={(e) => setValues({ ...values, thingsboardId: e.target.value })}
-            />
-          </Field>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button type="submit" loading={saving}>{saving ? 'Adding…' : 'Add device'}</Button>
+            <Button type="submit" loading={saving}>{saving ? 'Saving…' : device ? 'Save changes' : 'Add device'}</Button>
           </div>
         </form>
       </div>
@@ -121,7 +114,7 @@ function AddDeviceModal({ open, onClose, onSubmit }) {
   )
 }
 
-function DeviceCard({ device, onView }) {
+function DeviceCard({ device, onView, onEdit }) {
   return (
     <Card className="group flex flex-col p-5 transition hover:border-accent-hover/40 hover:shadow-xl hover:shadow-indigo-950/30">
       <div className="flex items-start justify-between gap-3">
@@ -134,7 +127,7 @@ function DeviceCard({ device, onView }) {
       <p className="truncate text-xs text-slate-500">{device.id} · {device.type}</p>
       <div className="mt-3 space-y-1.5 text-xs text-slate-400">
         <p className="flex items-center gap-1.5"><MapPin size={12} className="text-slate-500" aria-hidden="true" /> {device.location}</p>
-        <p className="flex items-center gap-1.5"><Signal size={12} className="text-slate-500" aria-hidden="true" /> {device.signal}% signal</p>
+        <p className="flex items-center gap-1.5"><Signal size={12} className="text-slate-500" aria-hidden="true" /> {device.signal == null ? 'Signal unavailable' : `${device.signal}% signal`}</p>
         <p className="flex items-center gap-1.5"><Thermometer size={12} className="text-slate-500" aria-hidden="true" /> {device.live ? formatTemp(device.live.temperature) : '—'} · <Droplets size={12} aria-hidden="true" /> {device.live ? formatHumidity(device.live.humidity) : '—'}</p>
       </div>
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
@@ -145,6 +138,11 @@ function DeviceCard({ device, onView }) {
         <Link to={`/devices/${device.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-300 hover:text-indigo-200">
           Details <ArrowUpRight size={12} aria-hidden="true" />
         </Link>
+        {onEdit && (
+          <button type="button" onClick={() => onEdit(device)} className="text-xs font-semibold text-slate-300 hover:text-white">
+            Edit
+          </button>
+        )}
       </div>
       {onView && (
         <button type="button" className="sr-only" onClick={() => onView(device)}>View device</button>
@@ -153,7 +151,7 @@ function DeviceCard({ device, onView }) {
   )
 }
 
-function DeviceRow({ device, onDelete }) {
+function DeviceRow({ device, onDelete, onEdit }) {
   return (
     <tr className="transition hover:bg-surface-2/50">
       <td className="px-4 py-3 sm:px-5">
@@ -177,6 +175,11 @@ function DeviceRow({ device, onDelete }) {
         <Link to={`/devices/${device.id}`} className="mr-1 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-indigo-300 hover:bg-accent/10">
           View <ArrowUpRight size={12} aria-hidden="true" />
         </Link>
+        {onEdit && (
+          <button type="button" onClick={() => onEdit(device)} className="mr-1 rounded-lg p-1.5 text-slate-500 transition hover:bg-accent/10 hover:text-indigo-300" aria-label={`Edit ${device.name}`}>
+            <Pencil size={14} />
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"
@@ -193,7 +196,7 @@ function DeviceRow({ device, onDelete }) {
 }
 
 export default function Devices() {
-  const { devices, loading: authLoading, addDevice, removeDevice } = useAuth()
+  const { devices, loading: authLoading, addDevice, editDevice, removeDevice } = useAuth()
   const { notify } = useToast()
 
   const [search, setSearch] = useState('')
@@ -203,6 +206,7 @@ export default function Devices() {
   const [sort, setSort] = useState('name')
   const [view, setView] = useState('grid')
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingDevice, setEditingDevice] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
 
   const availableLocations = useMemo(
@@ -232,11 +236,16 @@ export default function Devices() {
   const hasSearched = search || activeFilters > 0
 
   const handleAdd = async (input) => {
-    await addDevice({
-      ...input,
-      deviceKey: `${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
-    })
-    notify(`${input.name} added successfully!`, 'success')
+    if (editingDevice) {
+      await editDevice(editingDevice.id, input)
+      notify(`${input.name} updated successfully!`, 'success')
+    } else {
+      await addDevice({
+        ...input,
+        deviceKey: `${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+      })
+      notify(`${input.name} added successfully!`, 'success')
+    }
   }
 
   const handleDelete = async () => {
@@ -383,7 +392,7 @@ export default function Devices() {
       ) : view === 'grid' ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((d) => (
-            <DeviceCard key={d.id} device={d} />
+            <DeviceCard key={d.id} device={d} onEdit={setEditingDevice} />
           ))}
         </div>
       ) : (
@@ -404,7 +413,7 @@ export default function Devices() {
               </thead>
               <tbody className="divide-y divide-border/60">
                 {filtered.map((d) => (
-                  <DeviceRow key={d.id} device={d} onDelete={setConfirmDelete} />
+                  <DeviceRow key={d.id} device={d} onEdit={setEditingDevice} onDelete={setConfirmDelete} />
                 ))}
               </tbody>
             </table>
@@ -431,7 +440,15 @@ export default function Devices() {
         </div>
       )}
 
-      <AddDeviceModal open={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleAdd} />
+      <AddDeviceModal
+        open={modalOpen || !!editingDevice}
+        device={editingDevice}
+        onClose={() => {
+          setModalOpen(false)
+          setEditingDevice(null)
+        }}
+        onSubmit={handleAdd}
+      />
     </div>
   )
 }

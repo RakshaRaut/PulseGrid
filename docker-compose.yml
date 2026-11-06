@@ -30,11 +30,11 @@ services:
       PORT: 3000
       DATABASE_URL: "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-iot_monitoring}?schema=public"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in root .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       TB_BASE_URL: ${TB_BASE_URL:-http://thingsboard:8080}
+      TB_JWT_TOKEN: ${TB_JWT_TOKEN:-}
       TB_USERNAME: ${TB_USERNAME:-}
       TB_PASSWORD: ${TB_PASSWORD:-}
-      TB_JWT_TOKEN: ${TB_JWT_TOKEN:-}
-      THINGSBOARD_DEVICE_ID: ${THINGSBOARD_DEVICE_ID:-}
       TB_TELEMETRY_KEYS: ${TB_TELEMETRY_KEYS:-temperature,humidity,battery}
       OBSERVE_APP_KEY: ${OBSERVE_APP_KEY:-}
       OBSERVE_APP_SECRET: ${OBSERVE_APP_SECRET:-}
@@ -54,7 +54,7 @@ services:
       retries: 10
       start_period: 20s
 
-  iot-simulator:
+  iot-simulator-1:
     build:
       context: ./iot-simulator
       dockerfile: dockerfile
@@ -64,7 +64,40 @@ services:
     environment:
       THINGSBOARD_HOST: thingsboard
       THINGSBOARD_PORT: 1883
-      THINGSBOARD_TOKEN: ${THINGSBOARD_TOKEN:?Set THINGSBOARD_TOKEN in root .env}
+      THINGSBOARD_TOKEN: ${DEVICE_1_TOKEN}
+      TELEMETRY_API_URL: ${TELEMETRY_API_URL:-http://backend:3000/api}
+      TELEMETRY_JWT_TOKEN: ${TELEMETRY_JWT_TOKEN:-}
+      TELEMETRY_DEVICE_ID: ${TELEMETRY_DEVICE_ID:-}
+      SIMULATOR_MODE: ${SIMULATOR_MODE:-mqtt}
+    depends_on:
+      thingsboard:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const net = require('net'); const socket = net.createConnection({ host: process.env.THINGSBOARD_HOST, port: Number(process.env.THINGSBOARD_PORT) }); socket.setTimeout(3000); socket.on('connect', () => { socket.destroy(); }); socket.on('timeout', () => { socket.destroy(); process.exit(1); }); socket.on('error', () => process.exit(1));"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  iot-simulator-2:
+    build:
+      context: ./iot-simulator
+      dockerfile: dockerfile
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      THINGSBOARD_HOST: thingsboard
+      THINGSBOARD_PORT: 1883
+      THINGSBOARD_TOKEN: ${DEVICE_2_TOKEN}
+      TELEMETRY_API_URL: ${TELEMETRY_API_URL:-http://backend:3000/api}
+      TELEMETRY_JWT_TOKEN: ${TELEMETRY_JWT_TOKEN:-}
+      TELEMETRY_DEVICE_ID: ${TELEMETRY_DEVICE_ID:-}
+      SIMULATOR_MODE: ${SIMULATOR_MODE:-mqtt}
     depends_on:
       thingsboard:
         condition: service_healthy
@@ -117,8 +150,8 @@ services:
         - "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"
       interval: 10s
       timeout: 5s
-      retries: 30
-      start_period: 60s
+      retries: 60
+      start_period: 180s
 
   frontend:
     build:
